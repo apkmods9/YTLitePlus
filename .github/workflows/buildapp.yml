@@ -1,4 +1,4 @@
-name: YouTube_Premium_Final_Success
+name: YouTube_Premium_Precision_Build
 
 on:
   workflow_dispatch:
@@ -14,41 +14,49 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Tools
+      - name: Setup Environment
         run: |
+          # Cài đặt công cụ hệ thống cần thiết
           brew install dpkg ldid
+          # Tải Azule bản ổn định nhất
           git clone https://github.com/Al4ise/Azule ~/Azule
           chmod +x ~/Azule/azule
 
-      - name: Download and Repack (Sửa lỗi 9 bytes)
+      - name: Download Resources
         run: |
-          # 1. Tải IPA
+          # Tải file IPA từ link người dùng cung cấp
           curl -L "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
           
-          # 2. Tải Tweak từ server dự phòng (Link này cực kỳ ổn định)
-          curl -L "https://bit.ly/ytlite-deb-fixed" -o original.deb
+          # Tải Tweak YTLite (Sử dụng link trực tiếp để tránh lỗi 9 bytes)
+          curl -L "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o original.deb
           
-          # 3. Kiểm tra dung lượng (Phải trên 1MB mới đúng)
-          size=$(stat -f%z "original.deb")
-          if [ "$size" -lt 1000000 ]; then echo "Vẫn lỗi link tải!"; exit 1; fi
-          
-          # 4. Repack để macOS không báo lỗi "Inappropriate file type"
-          dpkg-deb -R original.deb temp
-          dpkg-deb -Zgzip -b temp fixed.deb
+          # Kiểm tra tính toàn vẹn của file tweak (Phải lớn hơn 1MB)
+          filesize=$(stat -f%z "original.deb")
+          if [ "$filesize" -lt 1000000 ]; then
+            echo "LỖI: File tweak tải về không chính xác (Dung lượng thực tế: $filesize bytes)."
+            exit 1
+          fi
 
-      - name: Final Inject
+      - name: Repack Tweak for macOS Compatibility
         run: |
+          # Giải nén và đóng gói lại để sửa lỗi 'Inappropriate file type' (Exit Code 5)
+          dpkg-deb -R original.deb temp_tweak
+          dpkg-deb -Zgzip -b temp_tweak fixed_tweak.deb
+
+      - name: Precision Injection
+        run: |
+          # Thực hiện chèn tweak với độ chính xác tuyệt đối về đường dẫn
           ~/Azule/azule -i "$(pwd)/youtube.ipa" \
-                        -f "$(pwd)/fixed.deb" \
+                        -f "$(pwd)/fixed_tweak.deb" \
                         -n "YouTube Premium" \
                         -b "com.google.ios.youtube.premium" \
                         -o "$(pwd)"
 
-      - name: Upload
+      - name: Artifact Output
         uses: actions/upload-artifact@v4
         with:
-          name: YouTube_Premium_Done
+          name: YouTube_Premium_Final_Build
           path: "*.ipa"
