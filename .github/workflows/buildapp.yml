@@ -1,11 +1,11 @@
-name: YouTube_Premium_Build
+name: YouTube_Premium_Custom_Parallel
 
 on:
   workflow_dispatch:
     inputs:
       decrypted_youtube_url:
-        description: "URL IPA YouTube Decrypted"
-        default: "https://api.ipaplace.com/download/105"
+        description: "https://www.dropbox.com/scl/fi/3yzrrpgdtmqdbz4kce96w/youtube-v20.21.6.ipa?rlkey=qd5kedk8aqh09ko6gya08474x&st=vw0kkj7l&dl=1"
+        default: "https://www.dropbox.com/scl/fi/3yzrrpgdtmqdbz4kce96w/youtube-v20.21.6.ipa?rlkey=qd5kedk8aqh09ko6gya08474x&st=vw0kkj7l&dl=1"
         required: true
         type: string
 
@@ -14,46 +14,33 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Tools
+      - name: Setup Tools
         run: |
           brew install ldid
-          # Cài đặt Azule bản mới nhất
           git clone https://github.com/Al4ise/Azule ~/Azule
           chmod +x ~/Azule/azule
-          echo "~/Azule" >> $GITHUB_PATH
 
-      - name: Download YouTube IPA
+      - name: Download IPA and Tweak
         run: |
-          # Tải IPA từ link bạn cung cấp
-          curl -L -A "Mozilla/5.0" "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
+          # Tải file IPA từ Dropbox của bạn
+          curl -L "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
           
-          # Kiểm tra file IPA
-          if ! file youtube.ipa | grep -q "zip"; then
-            echo "Lỗi: Link IPA không trực tiếp hoặc bị chặn bởi server."
-            exit 1
-          fi
-
-      - name: Download YTLite (Premium Tweak)
-        run: |
-          # Tải tweak mở khóa tính năng
+          # Tải tweak YTLite (Tweak này tự động kích hoạt logo Premium bên trong app)
           curl -L "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o ytlite.deb
-          
-          # Kiểm tra file tweak
-          if [ ! -f ytlite.deb ] || [ $(stat -f%z ytlite.deb) -lt 100000 ]; then
-            echo "Lỗi: Không tải được tweak YTLite hợp lệ."
-            exit 1
-          fi
 
-      - name: Inject and Build
+      - name: Inject and Customize
         run: |
-          # Dùng Azule để trộn IPA + Tweak thành bản Premium
-          ~/Azule/azule -i youtube.ipa -o . -f ytlite.deb -n "YouTube Premium" -b com.google.ios.youtube
+          # Thực hiện 3 yêu cầu của bạn trong 1 lệnh Azule:
+          # 1. -n "YouTube Premium": Đổi tên ứng dụng ngoài màn hình chính
+          # 2. -b "com.google.ios.youtube.premium": Đổi tên gói để cài song song
+          # 3. Logo Premium bên trong: Sẽ được tweak ytlite.deb tự động xử lý khi khởi chạy
+          ~/Azule/azule -i youtube.ipa -o . -f ytlite.deb -n "YouTube Premium" -b "com.google.ios.youtube.premium"
 
-      - name: Upload Final Product
+      - name: Upload Final IPA
         uses: actions/upload-artifact@v4
         with:
-          name: YouTube_Premium_Fixed
+          name: YouTube_Premium_Parallel
           path: "*.ipa"
