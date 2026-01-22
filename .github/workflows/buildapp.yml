@@ -1,4 +1,4 @@
-name: YouTube_Premium_Success_Final
+name: YouTube_Premium_NoRoot_Fix
 
 on:
   workflow_dispatch:
@@ -14,34 +14,47 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Tools and Download
+      - name: Setup Environment
         run: |
-          # 1. Cài đặt công cụ
+          # Cài đặt ldid (bắt buộc để ký ứng dụng)
           brew install ldid
-          git clone https://github.com/Al4ise/Azule ~/Azule
-          chmod +x ~/Azule/azule
           
-          # 2. Tải IPA từ Dropbox của bạn
+          # Tải Azule về thư mục Home
+          git clone https://github.com/Al4ise/Azule ~/Azule
+          
+          # CẤP QUYỀN: Thay vì dùng sudo, ta cấp quyền chạy cho user hiện tại
+          chmod -R 755 ~/Azule
+          chmod +x ~/Azule/azule
+
+      - name: Download Resources
+        run: |
+          # Tải IPA YouTube
           curl -L "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
           
-          # 3. Tải Tweak YTLite (Link dự phòng ổn định nhất)
-          # Đây là link trực tiếp đã được kiểm tra để tránh lỗi 404
+          # Tải Tweak YTLite (Link trực tiếp)
           curl -L "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o ytlite.deb
           
-          # 4. Kiểm tra file (Nếu không thấy file sẽ báo lỗi ngay)
-          ls -lh youtube.ipa ytlite.deb
+          # Kiểm tra file tồn tại
+          if [ ! -f youtube.ipa ] || [ ! -f ytlite.deb ]; then
+            echo "Lỗi: File chưa được tải về thành công."
+            exit 1
+          fi
 
-      - name: Inject and Customize
+      - name: Inject Tweak (No Sudo)
         run: |
-          # Dùng sudo để tránh lỗi "Inappropriate file type"
-          # -n "YouTube Premium": Tên hiển thị
-          # -b "com.google.ios.youtube.premium": Bundle ID cài song song
-          sudo ~/Azule/azule -i ./youtube.ipa -f ./ytlite.deb -n "YouTube Premium" -b "com.google.ios.youtube.premium" -o .
+          # Sử dụng đường dẫn tuyệt đối $(pwd) để tránh lỗi không tìm thấy file
+          # KHÔNG DÙNG SUDO ở đây theo yêu cầu của Azule
+          
+          ~/Azule/azule -i "$(pwd)/youtube.ipa" \
+                        -f "$(pwd)/ytlite.deb" \
+                        -n "YouTube Premium" \
+                        -b "com.google.ios.youtube.premium" \
+                        -o "$(pwd)"
 
-      - name: Upload Product
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: YouTube_Premium_Final
