@@ -1,4 +1,4 @@
-name: YouTube_Premium_Repack_Fix
+name: YouTube_Premium_Bulletproof
 
 on:
   workflow_dispatch:
@@ -17,41 +17,57 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Tools
+      - name: Install Dependencies
         run: |
-          # Cài đặt dpkg để xử lý file nén chuẩn mới
+          # Cài đặt dpkg để xử lý file deb
           brew install dpkg ldid
+          
+          # Cài đặt Azule
           git clone https://github.com/Al4ise/Azule ~/Azule
           chmod +x ~/Azule/azule
 
-      - name: Download Files
+      - name: Download Resources (Verified)
         run: |
+          # 1. Tải IPA
           curl -L "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
-          # Tải YTLitePlus
-          curl -L "https://github.com/BalackBurn/YTLitePlus/releases/download/v19.21.3-4.0.0/com.dvntm.ytliteplus_19.21.3-4.0.0_iphoneos-arm64.deb" -o original.deb
+          
+          # 2. Tải Tweak YTLite (Link ổn định v5.0.1)
+          # Sử dụng link release chính thức, tránh link redirect phức tạp
+          curl -L "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o original.deb
+          
+          # 3. KIỂM TRA QUAN TRỌNG
+          # Nếu file nhỏ hơn 10KB nghĩa là tải lỗi -> Dừng ngay để không gây lỗi "End of file"
+          filesize=$(stat -f%z "original.deb")
+          echo "Dung lượng Tweak: $filesize bytes"
+          if [ "$filesize" -lt 10000 ]; then
+            echo "Lỗi: File Tweak tải về bị lỗi (quá nhẹ). Vui lòng kiểm tra lại link."
+            exit 1
+          fi
 
-      - name: Repack Tweak (BẮT BUỘC ĐỂ SỬA LỖI)
+      - name: Repack Tweak (Fix Format macOS)
         run: |
-          # 1. Giải nén file tweak bằng dpkg (đọc được chuẩn Zstd)
+          # Bước này BẮT BUỘC để tránh lỗi "Inappropriate file type"
+          echo "Đang giải nén tweak..."
           dpkg-deb -R original.deb temp_folder
           
-          # 2. Đóng gói lại bằng chuẩn Gzip (để Azule/macOS đọc được)
-          # Bước này sửa lỗi "Inappropriate file type" triệt để
+          echo "Đang đóng gói lại với chuẩn Gzip..."
+          # -Zgzip giúp Azule trên macOS đọc được file này
           dpkg-deb -Zgzip -b temp_folder fixed_tweak.deb
           
-          echo "Đã đóng gói lại tweak thành công: fixed_tweak.deb"
+          echo "Hoàn tất Repack."
 
-      - name: Inject Final
+      - name: Inject and Customize
         run: |
-          # Dùng file fixed_tweak.deb đã được sửa lỗi định dạng
+          # Chạy Azule với file tweak đã được sửa chữa (fixed_tweak.deb)
+          # Sử dụng $(pwd) để đường dẫn tuyệt đối chính xác
           ~/Azule/azule -i "$(pwd)/youtube.ipa" \
                         -f "$(pwd)/fixed_tweak.deb" \
                         -n "YouTube Premium" \
                         -b "com.google.ios.youtube.premium" \
                         -o "$(pwd)"
 
-      - name: Upload Result
+      - name: Upload Final IPA
         uses: actions/upload-artifact@v4
         with:
-          name: YouTube_Premium_Repacked
+          name: YouTube_Premium_Final
           path: "*.ipa"
