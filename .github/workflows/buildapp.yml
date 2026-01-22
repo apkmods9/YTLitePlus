@@ -1,4 +1,4 @@
-name: YouTube_Premium_Final_Fix
+name: YouTube_Premium_Final_Absolute
 
 on:
   workflow_dispatch:
@@ -17,31 +17,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Azule
+      - name: Setup Tools and Download Everything
         run: |
+          # 1. Cài đặt Azule và ldid
           brew install ldid
           git clone https://github.com/Al4ise/Azule ~/Azule
           chmod +x ~/Azule/azule
-
-      - name: Prepare Files
-        run: |
-          # Tải IPA và Tweak vào cùng thư mục hiện tại
+          
+          # 2. Tải IPA và Tweak vào cùng một thư mục làm việc ($GITHUB_WORKSPACE)
           curl -L "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
           curl -L "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o ytlite.deb
           
-          # Xác nhận file tồn tại trước khi chạy Azule
-          ls -lh *.ipa *.deb
+          # 3. Kiểm tra file (Nếu không có file sẽ dừng ngay tại đây)
+          ls -la youtube.ipa ytlite.deb
 
-      - name: Inject and Customize
+      - name: Final Inject
         run: |
-          # Thực hiện chính xác 3 yêu cầu:
-          # 1. Tên app: YouTube Premium
-          # 2. Bundle ID: com.google.ios.youtube.premium (để cài song song)
-          # 3. Logo Premium: Tự động có nhờ tweak ytlite.deb
-          ~/Azule/azule -i youtube.ipa -f ytlite.deb -n "YouTube Premium" -b "com.google.ios.youtube.premium" -o .
+          # Sử dụng đường dẫn tuyệt đối để tránh lỗi "Not found"
+          # -n "YouTube Premium": Tên hiển thị
+          # -b "com.google.ios.youtube.premium": Bundle ID mới
+          ~/Azule/azule -i "$GITHUB_WORKSPACE/youtube.ipa" \
+                        -f "$GITHUB_WORKSPACE/ytlite.deb" \
+                        -n "YouTube Premium" \
+                        -b "com.google.ios.youtube.premium" \
+                        -o "$GITHUB_WORKSPACE"
 
-      - name: Upload Final IPA
+      - name: Upload Product
         uses: actions/upload-artifact@v4
         with:
-          name: YouTube_Premium_Unlocked
-          path: "YouTube Premium*.ipa"
+          name: YouTube_Final_Build
+          path: "*.ipa"
