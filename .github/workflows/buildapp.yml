@@ -1,106 +1,62 @@
-# Original idea by @ISnackable. Many thanks to him for handling the most hardest parts!
-# https://github.com/ISnackable/CercubePlus/blob/main/.github/workflows/Build.yml
-
-name: Build and Release YTLitePlus
+name: YouTube_Premium_Build
 
 on:
   workflow_dispatch:
     inputs:
-      sdk_version:
-        description: "iOS SDK Version"
-        default: "17.5"
-        required: true
-        type: string
       decrypted_youtube_url:
-        description: "Direct URL of the decrypted YouTube ipa"
-        default: ""
+        description: "URL IPA YouTube Decrypted"
+        default: "https://www.dropbox.com/scl/fi/3yzrrpgdtmqdbz4kce96w/youtube-v20.21.6.ipa?rlkey=qd5kedk8aqh09ko6gya08474x&st=vw0kkj7l&dl=1"
         required: true
         type: string
-      bundle_id:
-        description: "Modify the bundle ID"
-        default: "com.google.ios.youtube"
-        required: true
-        type: string
-      app_name:
-        description: "Modify the app name"
-        default: "YouTube"
-        required: true
-        type: string
-      commit_id:
-        description: "(Optional) Commit ID to build at"
-        default: ""
-        required: false
-        type: string
-      upload_artifact:
-        description: "Upload iPA as artifact (Public)"
-        default: false
-        required: false
-        type: boolean
-      catbox_upload:
-        description: "Upload iPA to Catbox.moe (URL)"
-        default: true
-        required: false
-        type: boolean
-      create_release:
-        description: "Create a draft release (Private)"
-        default: false
-        required: false
-        type: boolean
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   build:
-    name: Build YTLitePlus
-    runs-on: macos-15-intel
-    permissions:
-      contents: write
+    runs-on: macos-latest
 
     steps:
-      - name: Checkout Main
+      - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          path: main
-          ref: ${{ github.event.inputs.commit_id || github.ref }}
-          submodules: recursive
 
-      - name: Install Dependencies
-        run: brew install ldid dpkg make
-
-      - name: Download Theos
-        uses: actions/checkout@v4
-        with:
-          repository: theos/theos
-          ref: master
-          path: theos
-          submodules: recursive
-
-      - name: iOS SDK Caching
-        id: SDK
-        uses: actions/cache@v4
-        env:
-          cache-name: iOS-${{ inputs.sdk_version }}-SDK
-        with:
-          path: theos/sdks/
-          key: ${{ env.cache-name }}
-          restore-keys: ${{ env.cache-name }}
-
-      - name: Download iOS SDK
-        if: steps.SDK.outputs.cache-hit != 'true'
+      - name: Install Tools
         run: |
-          # Only download the specific SDK version
-          git clone -n --depth=1 --filter=tree:0 https://github.com/aricloverALT/sdks/
-          cd sdks
-          git sparse-checkout set --no-cone iPhoneOS${{ inputs.sdk_version }}.sdk
-          git checkout
-          mv *.sdk $THEOS/sdks
-        env:
-          THEOS: ${{ github.workspace }}/theos
+          brew install ldid
+          # Cài đặt Azule bản mới nhất
+          git clone https://github.com/Al4ise/Azule ~/Azule
+          chmod +x ~/Azule/azule
+          echo "~/Azule" >> $GITHUB_PATH
 
-      - name: Download Theos Jailed
-        uses: actions/checkout@v4
+      - name: Download YouTube IPA
+        run: |
+          # Tải IPA từ link bạn cung cấp
+          curl -L -A "Mozilla/5.0" "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
+          
+          # Kiểm tra file IPA
+          if ! file youtube.ipa | grep -q "zip"; then
+            echo "Lỗi: Link IPA không trực tiếp hoặc bị chặn bởi server."
+            exit 1
+          fi
+
+      - name: Download YTLite (Premium Tweak)
+        run: |
+          # Tải tweak mở khóa tính năng
+          curl -L "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o ytlite.deb
+          
+          # Kiểm tra file tweak
+          if [ ! -f ytlite.deb ] || [ $(stat -f%z ytlite.deb) -lt 100000 ]; then
+            echo "Lỗi: Không tải được tweak YTLite hợp lệ."
+            exit 1
+          fi
+
+      - name: Inject and Build
+        run: |
+          # Dùng Azule để trộn IPA + Tweak thành bản Premium
+          ~/Azule/azule -i youtube.ipa -o . -f ytlite.deb -n "YouTube Premium" -b com.google.ios.youtube
+
+      - name: Upload Final Product
+        uses: actions/upload-artifact@v4
+        with:
+          name: YouTube_Premium_Fixed
+          path: "*.ipa"
         with:
           repository: qnblackcat/theos-jailed
           ref: master
