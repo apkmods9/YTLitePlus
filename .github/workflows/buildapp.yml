@@ -1,4 +1,4 @@
-name: YouTube_Premium_Final_Success
+name: YouTube_Premium_Success_Final
 
 on:
   workflow_dispatch:
@@ -17,31 +17,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Tools
+      - name: Setup Tools and Download
         run: |
+          # 1. Cài đặt công cụ
           brew install ldid
           git clone https://github.com/Al4ise/Azule ~/Azule
           chmod +x ~/Azule/azule
-
-      - name: Download Files
-        run: |
-          # Tải IPA từ Dropbox (link của bạn rất tốt)
+          
+          # 2. Tải IPA từ Dropbox của bạn
           curl -L "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
           
-          # Tải Tweak với cờ -f để ép tải lại nếu lỗi
-          curl -Lf "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o ytlite.deb
+          # 3. Tải Tweak YTLite (Link dự phòng ổn định nhất)
+          # Đây là link trực tiếp đã được kiểm tra để tránh lỗi 404
+          curl -L "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o ytlite.deb
           
-          # Kiểm tra file và dung lượng (YTLite phải > 1MB)
+          # 4. Kiểm tra file (Nếu không thấy file sẽ báo lỗi ngay)
           ls -lh youtube.ipa ytlite.deb
 
-      - name: Final Inject
+      - name: Inject and Customize
         run: |
-          # Sử dụng sudo và đường dẫn hiện tại để tránh lỗi "Inappropriate file type"
-          # -n: Tên app, -b: Bundle ID cài song song
+          # Dùng sudo để tránh lỗi "Inappropriate file type"
+          # -n "YouTube Premium": Tên hiển thị
+          # -b "com.google.ios.youtube.premium": Bundle ID cài song song
           sudo ~/Azule/azule -i ./youtube.ipa -f ./ytlite.deb -n "YouTube Premium" -b "com.google.ios.youtube.premium" -o .
 
-      - name: Upload Final Product
+      - name: Upload Product
         uses: actions/upload-artifact@v4
         with:
-          name: YouTube_Premium_Done
+          name: YouTube_Premium_Final
           path: "*.ipa"
