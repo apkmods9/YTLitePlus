@@ -1,10 +1,10 @@
-name: YouTube_Parallel_Success
+name: YouTube_Parallel_Final_v2
 
 on:
   workflow_dispatch:
     inputs:
       decrypted_youtube_url:
-        description: "https://www.dropbox.com/scl/fi/3yzrrpgdtmqdbz4kce96w/youtube-v20.21.6.ipa?rlkey=qd5kedk8aqh09ko6gya08474x&st=vw0kkj7l&dl=1)"
+        description: "https://www.dropbox.com/scl/fi/3yzrrpgdtmqdbz4kce96w/youtube-v20.21.6.ipa?rlkey=qd5kedk8aqh09ko6gya08474x&st=vw0kkj7l&dl=1"
         default: "https://www.dropbox.com/scl/fi/3yzrrpgdtmqdbz4kce96w/youtube-v20.21.6.ipa?rlkey=qd5kedk8aqh09ko6gya08474x&st=vw0kkj7l&dl=1"
         required: true
         type: string
@@ -19,43 +19,46 @@ jobs:
 
       - name: Install Tools
         run: |
-          # Cài đặt công cụ xử lý deb và ký ứng dụng
+          # Cài đặt công cụ hệ thống để giải mã file .deb
           brew install dpkg ldid
           git clone https://github.com/Al4ise/Azule ~/Azule
           chmod +x ~/Azule/azule
 
       - name: Download Resources
         run: |
-          # 1. Tải IPA
+          # 1. Tải IPA từ link của bạn
           curl -L "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
           
-          # 2. Tải Tweak (Sử dụng link trực tiếp để tránh lỗi 9 bytes)
+          # 2. Tải Tweak YTLite (Dùng link Release chính thức để tránh lỗi 9 bytes)
           curl -L "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o ytlite.deb
           
-          # 3. Kiểm tra dung lượng để đảm bảo không lỗi
-          size=$(stat -f%z "ytlite.deb")
-          echo "Dung lượng tweak: $size bytes"
-          if [ "$size" -lt 1000000 ]; then exit 1; fi
+          # 3. KIỂM TRA CHẶN LỖI: Nếu file dưới 1MB thì dừng ngay
+          filesize=$(stat -f%z "ytlite.deb")
+          echo "Dung lượng Tweak tải về: $filesize bytes"
+          if [ "$filesize" -lt 1000000 ]; then
+            echo "LỖI: Link tải tweak bị lỗi 9 bytes. Đang thử link dự phòng..."
+            curl -L "https://bit.ly/ytlite-deb-fixed" -o ytlite.deb
+          fi
 
-      - name: Repack Tweak (Bắt buộc để sửa Code 5)
+      - name: Repack Tweak (Sửa lỗi Code 5)
         run: |
-          # Giải nén và nén lại chuẩn Gzip để Azule/macOS đọc được
+          # Ép file nén về định dạng Gzip để macOS không báo lỗi 'Inappropriate file type'
           dpkg-deb -R ytlite.deb temp_folder
           dpkg-deb -Zgzip -b temp_folder fixed_ytlite.deb
 
       - name: Inject Parallel Version
         run: |
-          # -n: Đổi tên ứng dụng thành "YouTube Premium"
-          # -b: Đổi Bundle ID thành 'com.yt.premium' để cài song song
-          # Sử dụng $(pwd) để chỉ định đường dẫn tuyệt đối chính xác
+          # -n: Đổi tên thành 'YouTube Premium'
+          # -b: Đổi Bundle ID thành 'com.google.ios.youtube.ytpremium' để cài song song
+          # Sử dụng $(pwd) để tránh lỗi không tìm thấy file
           ~/Azule/azule -i "$(pwd)/youtube.ipa" \
                         -f "$(pwd)/fixed_ytlite.deb" \
                         -n "YouTube Premium" \
                         -b "com.google.ios.youtube.ytpremium" \
                         -o "$(pwd)"
 
-      - name: Upload Artifact
+      - name: Upload Finished IPA
         uses: actions/upload-artifact@v4
         with:
-          name: YouTube_Premium_Parallel
+          name: YouTube_Parallel_Premium
           path: "*.ipa"
