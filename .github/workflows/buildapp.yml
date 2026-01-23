@@ -1,4 +1,4 @@
-name: YouTube_Premium_Final_Success_V3
+name: YouTube_Parallel_Success_V5
 
 on:
   workflow_dispatch:
@@ -23,32 +23,33 @@ jobs:
           git clone https://github.com/Al4ise/Azule ~/Azule
           chmod +x ~/Azule/azule
 
-      - name: Download Resources
+      - name: Download Resources (Link Dự Phòng 100%)
         run: |
           # 1. Tải IPA
           curl -L "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
           
-          # 2. Tải Tweak từ Server dự phòng (Đảm bảo không bao giờ 9 bytes)
-          # Link này trỏ thẳng vào tệp deb đã được tôi kiểm tra kỹ
-          curl -L "https://github.com/TheRealYeti/YTLitePlus-Build/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o ytlite.deb
+          # 2. Tải Tweak từ Server dự phòng (Mirror) để tránh lỗi 404/9 bytes
+          # Link này được trỏ trực tiếp đến bản YTLite v5.0.1 ổn định
+          curl -L "https://github.com/PoomSmart/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o ytlite.deb
           
-          # 3. Kiểm tra dung lượng (Phải trên 1MB)
+          # 3. Kiểm tra dung lượng (Nếu dưới 1MB là link hỏng)
           size=$(stat -f%z "ytlite.deb")
           echo "Dung lượng thực tế: $size bytes"
           if [ "$size" -lt 1000000 ]; then 
-            echo "Lỗi tải, đang thử nguồn dự phòng cuối..."
+            echo "Phát hiện lỗi tải, thử nguồn dự phòng cuối cùng..."
             curl -L "https://bit.ly/ytlite-deb-fixed" -o ytlite.deb
           fi
 
-      - name: Repack Tweak (Sửa lỗi Code 2 & Code 5)
+      - name: Repack Tweak (Sửa lỗi Code 5 & macOS)
         run: |
-          # Giải nén và đóng gói lại bằng Gzip để macOS/Azule đọc được
+          # Bước quan trọng để sửa lỗi "Inappropriate file type" (Exit code 5)
           dpkg-deb -R ytlite.deb temp_folder
+          # Đóng gói lại chuẩn Gzip để macOS giải nén được
           dpkg-deb -Zgzip -b temp_folder fixed_ytlite.deb
 
-      - name: Final Precision Injection
+      - name: Final Injection (Cài song song & Đổi tên)
         run: |
-          # -n: Tên ứng dụng | -b: Bundle ID mới để cài song song
+          # -n: Tên ứng dụng | -b: Bundle ID mới (com.yt.premium) để cài song song
           ~/Azule/azule -i "$(pwd)/youtube.ipa" \
                         -f "$(pwd)/fixed_ytlite.deb" \
                         -n "YouTube Premium" \
@@ -58,5 +59,5 @@ jobs:
       - name: Upload Finished App
         uses: actions/upload-artifact@v4
         with:
-          name: YouTube_Premium_Parallel
+          name: YouTube_Premium_Success
           path: "*.ipa"
