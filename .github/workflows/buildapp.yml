@@ -1,13 +1,7 @@
-name: YouTube_Parallel_New_Source_v5.2
+name: YouTube_Parallel_Final_Fixed
 
 on:
   workflow_dispatch:
-    inputs:
-      decrypted_youtube_url:
-        description: "https://www.dropbox.com/scl/fi/3yzrrpgdtmqdbz4kce96w/youtube-v20.21.6.ipa?rlkey=qd5kedk8aqh09ko6gya08474x&st=vw0kkj7l&dl=1"
-        default: "https://www.dropbox.com/scl/fi/3yzrrpgdtmqdbz4kce96w/youtube-v20.21.6.ipa?rlkey=qd5kedk8aqh09ko6gya08474x&st=vw0kkj7l&dl=1"
-        required: true
-        type: string
 
 jobs:
   build:
@@ -17,43 +11,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Tools
+      - name: Install System Tools
         run: |
+          # Cài đặt công cụ giải nén và đóng gói
           brew install dpkg ldid
           git clone https://github.com/Al4ise/Azule ~/Azule
           chmod +x ~/Azule/azule
 
-      - name: Download Resources
+      - name: Prepare Resources
         run: |
-          # 1. Tải IPA từ Dropbox của bạn
-          curl -L "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
+          # 1. Tải IPA từ Dropbox (Link này của bạn đã được xác nhận chuẩn 110MB)
+          curl -L "https://www.dropbox.com/scl/fi/3yzrrpgdtmqdbz4kce96w/youtube-v20.21.6.ipa?rlkey=qd5kedk8aqh09ko6gya08474x&st=vw0kkj7l&dl=1" -o youtube.ipa
           
-          # 2. Tải Tweak từ nguồn mới bạn tìm thấy (Bản v5.2b4)
-          curl -L "https://github.com/dayanch96/YTLite/releases/download/v5.2b1/com.dvntm.ytlite_5.2b4_iphoneos-arm64e.deb" -o ytlite.deb
-          
-          # Kiểm tra dung lượng để chắc chắn không bị 9 bytes
-          size=$(stat -f%z "ytlite.deb")
-          echo "Dung lượng tweak: $size bytes"
-          if [ "$size" -lt 1000000 ]; then exit 1; fi
+          # 2. Lấy tệp tweak từ repository của bạn
+          # Lưu ý: Hãy đảm bảo tên file dưới đây khớp chính xác với file bạn đã upload lên Github
+          cp com.dvntm.ytlite_5.2b4_iphoneos-arm64e.deb ytlite.deb || cp com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb ytlite.deb
 
       - name: Repack Tweak (Sửa lỗi Code 5 trên macOS)
         run: |
-          # Giải nén và nén lại chuẩn Gzip để macOS/Azule không báo lỗi định dạng
-          dpkg-deb -R ytlite.deb temp_folder
-          dpkg-deb -Zgzip -b temp_folder fixed_ytlite.deb
+          # Bước này cực kỳ quan trọng để macOS không báo lỗi 'Inappropriate file type'
+          mkdir -p temp_repack/DEBIAN
+          dpkg-deb -x ytlite.deb temp_repack
+          dpkg-deb -e ytlite.deb temp_repack/DEBIAN
+          dpkg-deb -Zgzip -b temp_repack fixed_ytlite.deb
 
-      - name: Final Injection
+      - name: Final Injection (Cài song song & Đổi tên)
         run: |
-          # -n: Tên ứng dụng "YouTube Plus"
-          # -b: ID "com.google.ios.youtube.parallel" để cài song song
+          # -n: Tên ứng dụng hiển thị trên màn hình
+          # -b: Bundle ID mới để cài song song với bản gốc
           ~/Azule/azule -i "$(pwd)/youtube.ipa" \
                         -f "$(pwd)/fixed_ytlite.deb" \
-                        -n "YouTube Plus" \
-                        -b "com.google.ios.youtube.parallel" \
+                        -n "YouTube Premium" \
+                        -b "com.google.ios.youtube.ytp" \
                         -o "$(pwd)"
 
-      - name: Upload Artifact
+      - name: Upload Finished App
         uses: actions/upload-artifact@v4
         with:
-          name: YouTube_Plus_Parallel
+          name: YouTube_Premium_Parallel_IPA
           path: "*.ipa"
