@@ -1,4 +1,4 @@
-name: YouTube_Parallel_Install_Fix
+name: YouTube_Premium_Final
 
 on:
   workflow_dispatch:
@@ -17,40 +17,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Bước này cài đặt các công cụ cần thiết để xử lý file và ký ứng dụng
-      - name: Install Tools
+      - name: Setup Tools
         run: |
-          brew install dpkg ldid
+          brew install ldid
           git clone https://github.com/Al4ise/Azule ~/Azule
           chmod +x ~/Azule/azule
 
-      # Tải file và sửa lỗi định dạng tweak (để tránh lỗi Exit Code 5 cũ)
-      - name: Download and Fix Tweak
+      - name: Download IPA from Dropbox
         run: |
+          # Tải trực tiếp không kiểm tra rườm rà vì link Dropbox đã chuẩn
           curl -L "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
-          curl -L "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o original.deb
-          
-          # Kiểm tra dung lượng file để tránh lỗi 9 bytes
-          size=$(stat -f%z "original.deb")
-          if [ "$size" -lt 1000000 ]; then echo "Lỗi tải tweak!"; exit 1; fi
-          
-          # Đóng gói lại tweak theo chuẩn Gzip để macOS xử lý mượt mà
-          dpkg-deb -R original.deb temp
-          dpkg-deb -Zgzip -b temp fixed.deb
 
-      # BƯỚC QUAN TRỌNG: Đổi tên và tạo bản cài song song
-      - name: Inject and Rename
+      - name: Download YTLite Tweak
         run: |
-          # -n: Đổi tên ứng dụng thành "YouTube Premium"
-          # -b: Đổi Bundle ID thành một tên mới (ví dụ: com.yt.premium) để cài song song với bản gốc
-          ~/Azule/azule -i "$(pwd)/youtube.ipa" \
-                        -f "$(pwd)/fixed.deb" \
-                        -n "YouTube Premium" \
-                        -b "com.google.ios.youtube.ytpremium" \
-                        -o "$(pwd)"
+          curl -L "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o ytlite.deb
 
-      - name: Upload Result
+      - name: Inject and Build
+        run: |
+          # Thực hiện chèn tweak vào IPA
+          ~/Azule/azule -i youtube.ipa -o . -f ytlite.deb -n "YouTube Premium" -b com.google.ios.youtube
+
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: YouTube_Premium_Parallel
+          name: YouTube_V20.21.6_Premium
           path: "*.ipa"
