@@ -1,4 +1,4 @@
-name: YouTube_Premium_Parallel_Final_Fix
+name: YouTube_Parallel_Final_v3
 
 on:
   workflow_dispatch:
@@ -23,44 +23,41 @@ jobs:
           git clone https://github.com/Al4ise/Azule ~/Azule
           chmod +x ~/Azule/azule
 
-      - name: Download Resources (Linh tải mới)
+      - name: Download Resources (Sửa lỗi 9 bytes)
         run: |
           # 1. Tải IPA
           curl -L "${{ github.event.inputs.decrypted_youtube_url }}" -o youtube.ipa
           
-          # 2. Tải Tweak từ link Mirror ổn định (Tránh lỗi 9 bytes)
-          # Đây là link trực tiếp tới file deb đã kiểm tra
-          curl -L "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb" -o ytlite.deb
+          # 2. Tải Tweak từ nguồn Mirror (Cực kỳ ổn định, tránh lỗi 9 bytes)
+          # Sử dụng wget thay curl để tải tệp deb ổn định hơn
+          wget -O ytlite.deb "https://github.com/BalackBurn/YTLite/releases/download/v5.0.1/com.dvntm.ytlite_5.0.1_iphoneos-arm64.deb"
           
           # 3. Kiểm tra dung lượng thực tế
           size=$(stat -f%z "ytlite.deb")
           echo "Dung lượng tweak: $size bytes"
           if [ "$size" -lt 1000000 ]; then 
-            echo "Vẫn lỗi tải tweak, thử link dự phòng cuối cùng..."
-            curl -L "https://bit.ly/ytlite-deb-fixed" -o ytlite.deb
+            echo "Lỗi: Link chính bị 9 bytes. Đang tải từ link dự phòng vĩnh viễn..."
+            wget -O ytlite.deb "https://bit.ly/ytlite-deb-fixed"
           fi
 
       - name: Repack Tweak (Sửa lỗi Code 5 & Code 2)
         run: |
-          # Kiểm tra lại file trước khi giải nén để tránh lỗi 'not a Debian format'
-          if ! dpkg-deb -I ytlite.deb > /dev/null 2>&1; then
-            echo "File deb vẫn hỏng, quy trình không thể tiếp tục."
-            exit 1
-          fi
-          dpkg-deb -R ytlite.deb temp_folder
-          dpkg-deb -Zgzip -b temp_folder fixed_ytlite.deb
+          # Ép định dạng về Gzip để macOS không báo 'Inappropriate file type'
+          dpkg-deb -x ytlite.deb temp_ext
+          dpkg-deb -e ytlite.deb temp_ext/DEBIAN
+          dpkg-deb -Zgzip -b temp_ext fixed_ytlite.deb
 
-      - name: Final Injection
+      - name: Final Injection (Cài song song & Đổi tên)
         run: |
-          # Sử dụng Bundle ID mới để cài song song
+          # -n: Tên mới | -b: ID mới để không bị đè app gốc
           ~/Azule/azule -i "$(pwd)/youtube.ipa" \
                         -f "$(pwd)/fixed_ytlite.deb" \
                         -n "YouTube Premium" \
-                        -b "com.google.ios.youtube.ytp" \
+                        -b "com.google.ios.youtube.parallel" \
                         -o "$(pwd)"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: YouTube_Premium_Success
+          name: YouTube_Premium_Parallel
           path: "*.ipa"
